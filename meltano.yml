@@ -1,0 +1,54 @@
+send_anonymous_usage_stats: true
+project_id: tap-weatherapi
+default_environment: test
+requires_meltano: '>=4.0'
+environments:
+- name: test
+plugins:
+  extractors:
+  - name: tap-weatherapi
+    namespace: tap_weatherapi
+    pip_url: requests-cache -e .
+    capabilities:
+    - state
+    - catalog
+    - discover
+    - about
+    - stream-maps
+    - structured-logging
+
+    settings_group_validation:
+    - [api_key, locations, start_date]
+
+    settings:
+    - name: api_key
+      kind: string
+      label: API Key
+      description: WeatherAPI key (https://www.weatherapi.com/my/)
+      sensitive: true
+
+    - name: locations
+      kind: array
+      label: Locations
+      description: >
+        One or more locations to fetch weather data for.
+        Accepts US zip codes, city names, lat/lon pairs, etc.
+
+    - name: start_date
+      kind: string
+      label: Start Date
+      description: Earliest date for historical data sync (YYYY-MM-DD).
+
+    - name: forecast_days
+      kind: integer
+      value: 5
+
+      label: Forecast Days
+      description: Number of days to include in the forecast stream (1–14).
+  loaders:
+  - name: target-jsonl
+    variant: andyh1203
+    pip_url: target-jsonl
+  - name: target-duckdb
+    variant: meltanolabs
+    pip_url: git+https://github.com/MeltanoLabs/target-duckdb.git
