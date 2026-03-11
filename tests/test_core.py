@@ -7,7 +7,7 @@ import pytest
 import requests
 from singer_sdk.testing import get_tap_test_class
 
-from tap_weatherapi.streams import DateRangePaginator
+from tap_weatherapi.streams import DateRangePaginator, DateWindow
 from tap_weatherapi.tap import TapWeatherAPI
 
 SAMPLE_CONFIG = {
@@ -43,15 +43,23 @@ class TestDateRangePaginator:
         p = DateRangePaginator(start, end)
 
         assert not p.finished
-        assert p.current_value == start
+        assert p.current_value == DateWindow(
+            start=date(2024, 1, 1),
+            end=date(2024, 1, 20),
+        )
 
         p.advance(_FAKE_RESPONSE)
         assert p.finished
 
+    def test_window_end_is_capped_at_end_date(self) -> None:
+        """The last window's end is capped at end_date, not start + window_size - 1."""
+        p = DateRangePaginator(date(2024, 1, 1), date(2024, 1, 10))
+        assert p.current_value.end == date(2024, 1, 10)
+
     def test_multiple_windows(self) -> None:
-        """A 60-day range produces three pages (0-29, 30-59, 60)."""
+        """A range spanning multiple windows carries correct start/end per window."""
         start = date(2024, 1, 1)
-        end = date(2024, 3, 1)  # 61 days later
+        end = date(2024, 3, 1)  # 61 days later → 3 windows
         p = DateRangePaginator(start, end)
 
         pages = [p.current_value]
@@ -63,37 +71,67 @@ class TestDateRangePaginator:
 
         assert p.finished
         assert pages == [
-            date(2024, 1, 1),
-            date(2024, 1, 31),
-            date(2024, 3, 1),
+            DateWindow(
+                start=date(2024, 1, 1),
+                end=date(2024, 1, 30),
+            ),
+            DateWindow(
+                start=date(2024, 1, 31),
+                end=date(2024, 2, 29),
+            ),
+            DateWindow(
+                start=date(2024, 3, 1),
+                end=date(2024, 3, 1),
+            ),
         ]
 
     def test_exact_30_day_boundary(self) -> None:
         """A range of exactly 30 days produces two pages."""
-        start = date(2024, 1, 1)
-        end = date(2024, 1, 31)  # start + 30 days, still within range
-        p = DateRangePaginator(start, end)
+        p = DateRangePaginator(
+            date(2024, 1, 1),
+            date(2024, 1, 31),
+        )
 
-        assert p.current_value == start
+        assert p.current_value == DateWindow(
+            start=date(2024, 1, 1),
+            end=date(2024, 1, 30),
+        )
         p.advance(_FAKE_RESPONSE)
-        assert p.current_value == date(2024, 1, 31)
+        assert p.current_value == DateWindow(
+            start=date(2024, 1, 31),
+            end=date(2024, 1, 31),
+        )
         p.advance(_FAKE_RESPONSE)
         assert p.finished
 
     def test_start_after_end_is_immediately_finished(self) -> None:
         """When start_date > end_date no requests should be made."""
-        p = DateRangePaginator(
-            date(2025, 1, 1),
-            date(2024, 1, 1),
-        )
+        p = DateRangePaginator(date(2025, 1, 1), date(2024, 1, 1))
         assert p.finished
 
     def test_start_equals_end(self) -> None:
-        """A single-day range produces exactly one page."""
+        """A single-day range produces one page with start == end."""
         d = date(2024, 6, 15)
         p = DateRangePaginator(d, d)
 
         assert not p.finished
+        assert p.current_value == DateWindow(start=d, end=d)
+        p.advance(_FAKE_RESPONSE)
+        assert p.finished
+
+    def test_custom_window_size(self) -> None:
+        """window_size is respected when set to a non-default value."""
+        p = DateRangePaginator(date(2024, 1, 1), date(2024, 1, 14), window_size=7)
+
+        assert p.current_value == DateWindow(
+            start=date(2024, 1, 1),
+            end=date(2024, 1, 7),
+        )
+        p.advance(_FAKE_RESPONSE)
+        assert p.current_value == DateWindow(
+            start=date(2024, 1, 8),
+            end=date(2024, 1, 14),
+        )
         p.advance(_FAKE_RESPONSE)
         assert p.finished
 
