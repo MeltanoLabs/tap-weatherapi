@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import KW_ONLY, dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -125,22 +126,49 @@ _WEATHER_DAY_SCHEMA = th.PropertiesList(
 # ---------------------------------------------------------------------------
 
 
-class DateRangePaginator(BaseAPIPaginator[date]):
-    """Paginator that advances through consecutive 30-day windows."""
+@dataclass(slots=True, eq=True)
+class DateWindow:
+    """A closed date interval [start, end] representing one paginator window."""
+
+    _: KW_ONLY
+
+    start: date
+    end: date
+
+    def __repr__(self) -> str:
+        """Return a string representation of the date window."""
+        return f"DateWindow({self.start} → {self.end})"
+
+
+class DateRangePaginator(BaseAPIPaginator[DateWindow]):
+    """Paginator that advances through consecutive fixed-size date windows.
+
+    Each page token is a :class:`DateWindow` carrying both the start and end
+    of the window, so ``get_url_params`` can consume them directly without
+    needing to know the window size or the global end date ceiling.
+    """
 
     @override
-    def __init__(self, start_date: date, end_date: date) -> None:
+    def __init__(self, start_date: date, end_date: date, window_size: int = 30) -> None:
         """Initialize the paginator."""
         self._end_date = end_date
-        super().__init__(start_value=start_date)
+        self._window_size = window_size
+        first = DateWindow(
+            start=start_date,
+            end=min(start_date + timedelta(days=window_size - 1), end_date),
+        )
+        super().__init__(start_value=first)
         if start_date > end_date:
             # Nothing to fetch - mark done before any request is made.
             self._finished = True
 
     @override
-    def get_next(self, response: requests.Response) -> date | None:
-        next_start = self._value + timedelta(days=30)
-        return next_start if next_start <= self._end_date else None
+    def get_next(self, response: requests.Response) -> DateWindow | None:
+        next_start = self._value.end + timedelta(days=1)
+        if next_start > self._end_date:
+            return None
+        next_end = min(next_start + timedelta(days=self._window_size - 1), self._end_date)
+        return DateWindow(start=next_start, end=next_end)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +218,7 @@ class ForecastStream(WeatherAPIStream[Any]):
         }
 
 
-class HistoricalStream(WeatherAPIStream[date]):
+class HistoricalStream(WeatherAPIStream[DateWindow]):
     """Daily historical weather, one record per day per location.
 
     Fetches from ``start_date`` config (or last bookmark) to yesterday,
@@ -231,15 +259,14 @@ class HistoricalStream(WeatherAPIStream[date]):
     def get_url_params(
         self,
         context: Context | None,
-        next_page_token: date | None,
+        next_page_token: DateWindow | None,
     ) -> dict[str, Any]:
         if next_page_token is None:
-            # Shouldn't happen - DateRangePaginator always provides a start date.
+            # Shouldn't happen - DateRangePaginator always provides a window.
             return {}
-        window_end = min(next_page_token + timedelta(days=29), _today() - timedelta(days=1))
         location = context["location"] if context else self.config["locations"][0]
         return {
             "q": location,
-            "dt": next_page_token.isoformat(),
-            "end_dt": window_end.isoformat(),
+            "dt": next_page_token.start.isoformat(),
+            "end_dt": next_page_token.end.isoformat(),
         }
