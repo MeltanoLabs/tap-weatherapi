@@ -17,10 +17,8 @@ else:
     from typing_extensions import override
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     import requests
-    from singer_sdk.helpers.types import Context, Record
+    from singer_sdk.helpers.types import Context
 
 
 # ---------------------------------------------------------------------------
@@ -211,20 +209,12 @@ class HistoricalStream(WeatherAPIStream[date]):
     def partitions(self) -> list[dict[str, Any]]:
         return [{"location": loc} for loc in self.config["locations"]]
 
-    # ------------------------------------------------------------------
-    # Store context before paginator is created (SDK doesn't pass it to
-    # get_new_paginator, so we cache it here for one sync pass at a time).
-    # ------------------------------------------------------------------
-
-    @override
-    def request_records(self, context: Context | None) -> Iterable[Record]:
-        self._sync_context: Context | None = context
-        yield from super().request_records(context)
-
     @override
     def get_new_paginator(self) -> DateRangePaginator:
-        context = getattr(self, "_sync_context", None)
-        start = self._effective_start_date(context)
+        # Stream.sync() sets self.context to the current partition before
+        # get_records() → request_records() → get_new_paginator() is called,
+        # so self.context already reflects the correct partition here.
+        start = self._effective_start_date(self.context)
         end = _today() - timedelta(days=1)
         return DateRangePaginator(start_date=start, end_date=end)
 
