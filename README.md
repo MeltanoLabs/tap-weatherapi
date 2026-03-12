@@ -17,15 +17,15 @@ The WeatherAPI response is a nested object. This tap flattens it into **one reco
 
 ```
 API response                       Emitted record field(s)
-─────────────────────────────────────────────────────────────────
-(config)                         → location          ← the query string used
-location.name/region/country/…  → location_name, location_region, …
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
+(config)                         → location                            ← the query string used
+location.name/region/country/... → location_name, location_region, ...
 forecastday[].date               → date, date_epoch
-forecastday[].day.maxtemp_c/…   → maxtemp_c, mintemp_c, avgtemp_c, …  (spread flat)
-forecastday[].day.totalprecip_mm → totalprecip_mm, totalprecip_in, …
-forecastday[].day.condition      → condition          ← kept as object {text, icon, code}
-forecastday[].astro.*            → sunrise, sunset, moonrise, moon_phase, …  (spread flat)
-forecastday[].hour               → hour               ← kept as array of 24 hourly objects
+forecastday[].day.maxtemp_c/...  → maxtemp_c, mintemp_c, avgtemp_c, ...  (spread flat)
+forecastday[].day.totalprecip_mm → totalprecip_mm, totalprecip_in, ...
+forecastday[].day.condition      → condition                           ← kept as object {text, icon, code}
+forecastday[].astro.*            → sunrise, sunset, moonrise, moon_phase, ...  (spread flat)
+forecastday[].hour               → hour                                ← kept as array of 24 hourly objects
 ```
 
 The `day` and `astro` sub-objects are spread into the top level of the record. The `hour` array is kept nested because it has 24 items each with ~30 fields - flattening it would produce 720 columns.
