@@ -60,7 +60,7 @@ class TapWeatherAPI(Tap):
         ),
         th.Property(
             "forecast_days",
-            th.IntegerType(nullable=False),
+            th.IntegerType(nullable=False, minimum=1, maximum=14),
             default=5,
             title="Forecast Days",
             description="Number of days to include in the forecast stream (1-14).",
