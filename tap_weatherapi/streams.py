@@ -194,8 +194,8 @@ class ForecastStream(WeatherAPIStream[Any]):
     replication_key = None
     schema = _WEATHER_DAY_SCHEMA.to_dict()
 
-    @override
     @property
+    @override
     def partitions(self) -> list[dict[str, Any]]:
         return [{"location": loc} for loc in self.config["locations"]]
 
@@ -232,8 +232,8 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
     replication_key = "date"
     schema = _WEATHER_DAY_SCHEMA.to_dict()
 
-    @override
     @property
+    @override
     def partitions(self) -> list[dict[str, Any]]:
         return [{"location": loc} for loc in self.config["locations"]]
 
@@ -252,8 +252,8 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
         if state_val:
             # Advance one day past the last synced date to avoid re-processing.
             raw = state_val if isinstance(state_val, str) else str(state_val)
-            return date.fromisoformat(raw[:10]) + timedelta(days=1)
-        return date.fromisoformat(self.config["start_date"])
+            return date.fromisoformat(raw) + timedelta(days=1)
+        return datetime.fromisoformat(self.config["start_date"]).date()
 
     @override
     def get_url_params(

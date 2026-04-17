@@ -53,10 +53,10 @@ class TapWeatherAPI(Tap):
         ),
         th.Property(
             "start_date",
-            th.StringType(nullable=False),
+            th.DateTimeType(nullable=False),
             required=True,
             title="Start Date",
-            description="Earliest date for historical data sync (YYYY-MM-DD).",
+            description="Earliest date for historical data sync, in ISO format",
         ),
         th.Property(
             "forecast_days",
