@@ -25,13 +25,13 @@ _T = TypeVar("_T")
 class WeatherAPIStream(RESTStream[_T], Generic[_T]):
     """WeatherAPI stream class."""
 
-    @override
     @property
+    @override
     def url_base(self) -> str:
         return "https://api.weatherapi.com/v1"
 
-    @override
     @property
+    @override
     def authenticator(self) -> APIKeyAuthenticator:
         return APIKeyAuthenticator(
             key="key",
