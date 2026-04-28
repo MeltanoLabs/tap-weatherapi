@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from singer_sdk import typing as th
 from singer_sdk.pagination import BaseAPIPaginator, SinglePagePaginator
 
-from tap_weatherapi.client import WeatherAPIStream
+from tap_weatherapi.client import BulkChunk, WeatherAPIStream
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -78,6 +78,11 @@ _WEATHER_DAY_SCHEMA = th.PropertiesList(
         "location",
         th.StringType,
         description="The query string used (zip, city, lat/lon, …)",
+    ),
+    th.Property(
+        "custom_id",
+        th.StringType,
+        description="A custom identifier for the location",
     ),
     th.Property("date", th.StringType, description="Calendar date (YYYY-MM-DD)"),
     th.Property("date_epoch", th.IntegerType),
@@ -194,24 +199,24 @@ class ForecastStream(WeatherAPIStream[Any]):
     replication_key = None
     schema = _WEATHER_DAY_SCHEMA.to_dict()
 
-    @property
     @override
-    def partitions(self) -> list[dict[str, Any]]:
-        return [{"location": loc} for loc in self.config["locations"]]
-
-    @override
-    def get_new_paginator(self) -> SinglePagePaginator:
+    def get_non_bulk_paginator(self) -> SinglePagePaginator:
         return SinglePagePaginator()
 
     @override
     def get_url_params(
         self,
         context: Context | None,
-        next_page_token: Any | None,
+        next_page_token: None | BulkChunk[None],
     ) -> dict[str, Any]:
-        location = context["location"] if context else self.config["locations"][0]
+        if isinstance(next_page_token, BulkChunk):
+            query = "bulk"
+        else:
+            assert context is not None  # noqa: S101
+            query = context["location"]
+
         return {
-            "q": location,
+            "q": query,
             "days": self.config.get("forecast_days", 5),
             "aqi": "no",
             "alerts": "no",
@@ -232,16 +237,8 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
     replication_key = "date"
     schema = _WEATHER_DAY_SCHEMA.to_dict()
 
-    @property
     @override
-    def partitions(self) -> list[dict[str, Any]]:
-        return [{"location": loc} for loc in self.config["locations"]]
-
-    @override
-    def get_new_paginator(self) -> DateRangePaginator:
-        # Stream.sync() sets self.context to the current partition before
-        # get_records() → request_records() → get_new_paginator() is called,
-        # so self.context already reflects the correct partition here.
+    def get_non_bulk_paginator(self) -> DateRangePaginator:
         start = self._effective_start_date(self.context)
         end = _today() - timedelta(days=1)
         return DateRangePaginator(start_date=start, end_date=end)
@@ -252,21 +249,27 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
         if state_val:
             # Advance one day past the last synced date to avoid re-processing.
             raw = state_val if isinstance(state_val, str) else str(state_val)
-            return date.fromisoformat(raw) + timedelta(days=1)
+            return date.fromisoformat(raw)
         return datetime.fromisoformat(self.config["start_date"]).date()
 
     @override
     def get_url_params(
         self,
         context: Context | None,
-        next_page_token: DateWindow | None,
+        next_page_token: DateWindow | BulkChunk[DateWindow] | None,
     ) -> dict[str, Any]:
-        if next_page_token is None:
-            # Shouldn't happen - DateRangePaginator always provides a window.
-            return {}
-        location = context["location"] if context else self.config["locations"][0]
+        assert next_page_token is not None  # noqa: S101
+
+        if isinstance(next_page_token, BulkChunk):
+            query = "bulk"
+            window: DateWindow = next_page_token.current_value  # ty:ignore[invalid-assignment]
+        else:
+            assert context is not None  # noqa: S101
+            query = context["location"]
+            window = next_page_token
+
         return {
-            "q": location,
-            "dt": next_page_token.start.isoformat(),
-            "end_dt": next_page_token.end.isoformat(),
+            "q": query,
+            "dt": window.start.isoformat(),
+            "end_dt": window.end.isoformat(),
         }
