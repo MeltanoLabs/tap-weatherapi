@@ -18,7 +18,7 @@ else:
 try:
     import requests_cache
 
-    requests_cache.install_cache()
+    requests_cache.install_cache(allowable_methods=["GET", "POST"])
 except ImportError:
     pass
 
@@ -42,13 +42,28 @@ class TapWeatherAPI(Tap):
         ),
         th.Property(
             "locations",
-            th.ArrayType(th.StringType(nullable=False), nullable=False),
-            required=True,
+            th.ArrayType(th.StringType(nullable=False)),
+            required=False,
             title="Locations",
             description=(
                 "One or more locations to fetch weather data for. "
-                "Accepts US zip codes, city names, lat/lon pairs, etc. "
-                "See https://www.weatherapi.com/docs/#intro-request for full syntax."
+                "Accepts city names, US zip codes, UK/Canada postcodes, lat/lon pairs, "
+                "airport codes, IP addresses, and Search API IDs. "
+                "See https://www.weatherapi.com/docs/#intro-request for full syntax. "
+                "Use `locations_file` instead when syncing many locations."
+            ),
+        ),
+        th.Property(
+            "locations_file",
+            th.StringType,
+            required=False,
+            title="Locations File",
+            description=(
+                "Path to a JSON file listing locations to sync. "
+                'Format: [{"location": "90210", "custom_id": "beverly-hills"}, ...]. '
+                "`location` accepts the same values as the `locations` setting. "
+                "`custom_id` is optional; when provided it is passed through to each record "
+                "and used to correlate bulk-request responses with the original query."
             ),
         ),
         th.Property(
@@ -64,6 +79,20 @@ class TapWeatherAPI(Tap):
             default=5,
             title="Forecast Days",
             description="Number of days to include in the forecast stream (1-14).",
+        ),
+        th.Property(
+            "use_bulk_requests",
+            th.BooleanType(nullable=False),
+            default=False,
+            title="Use Bulk Requests",
+            description=(
+                "Send all locations in a single POST request instead of one GET request per "
+                "location. "
+                "Requires a WeatherAPI Pro+, Business, or Enterprise plan. "
+                "Maximum 50 locations per request. "
+                "Each location in a bulk request still counts as one API call. "
+                "See https://www.weatherapi.com/docs/#intro-bulk."
+            ),
         ),
     ).to_dict()
 

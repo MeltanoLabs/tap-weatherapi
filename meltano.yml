@@ -19,6 +19,7 @@ plugins:
 
     settings_group_validation:
     - [api_key, locations, start_date]
+    - [api_key, locations_file, start_date]
 
     settings:
     - name: api_key
@@ -32,7 +33,20 @@ plugins:
       label: Locations
       description: >
         One or more locations to fetch weather data for.
-        Accepts US zip codes, city names, lat/lon pairs, etc.
+        Accepts city names, US zip codes, UK/Canada postcodes, lat/lon pairs, airport codes,
+        IP addresses, and Search API IDs.
+        See https://www.weatherapi.com/docs/#intro-request for full syntax.
+        Use `locations_file` instead when syncing many locations.
+
+    - name: locations_file
+      kind: string
+      label: Locations File
+      description: >
+        Path to a JSON file listing locations to sync.
+        Format: [{"location": "90210", "custom_id": "beverly-hills"}, ...].
+        `location` accepts the same values as the `locations` setting.
+        `custom_id` is optional; when provided it is passed through to each record
+        and used to correlate bulk-request responses with the original query.
 
     - name: start_date
       kind: string
@@ -45,6 +59,18 @@ plugins:
 
       label: Forecast Days
       description: Number of days to include in the forecast stream (1–14).
+
+    - name: use_bulk_requests
+      kind: boolean
+      value: false
+      label: Use Bulk Requests
+      description: >
+        Send all locations in a single POST request instead of one GET request per location.
+        Requires a WeatherAPI Pro+, Business, or Enterprise plan.
+        Maximum 50 locations per request.
+        Each location in a bulk request still counts as one API call.
+        See https://www.weatherapi.com/docs/#intro-bulk.
+
   loaders:
   - name: target-jsonl
     variant: andyh1203

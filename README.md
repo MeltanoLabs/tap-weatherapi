@@ -44,21 +44,56 @@ uv tool install git+https://github.com/MeltanoLabs/tap-weatherapi.git@main
 
 | Setting | Required | Default | Description |
 |:--------|:--------:|:-------:|:------------|
-| `api_key` | ✅ | - | WeatherAPI key - get one at https://www.weatherapi.com/my/ |
-| `locations` | ✅ | - | JSON array of locations to sync. Accepts US zip codes, city names, `lat,lon` pairs, and [more](https://www.weatherapi.com/docs/#intro-request). |
+| `api_key` | ✅ | - | WeatherAPI key — get one at https://www.weatherapi.com/my/ |
+| `locations` | ✅\* | - | JSON array of locations to sync. Accepts city names, US zip codes, UK/Canada postcodes, `lat,lon` pairs, airport codes, IP addresses, and [more](https://www.weatherapi.com/docs/#intro-request). |
+| `locations_file` | ✅\* | - | Path to a JSON file listing locations. Format: `[{"location": "90210", "custom_id": "beverly-hills"}, ...]`. Use instead of `locations` when managing many locations. |
 | `start_date` | ✅ | - | Earliest date for the `historical` stream (`YYYY-MM-DD`). |
 | `forecast_days` | - | `5` | Number of days for the `forecast` stream (1–14). |
+| `use_bulk_requests` | - | `false` | Fetch all locations in a single POST request. Requires Pro+, Business, or Enterprise plan. Max 50 locations. See [Bulk API](#bulk-api). |
 
-Example `config.json`:
+\* Exactly one of `locations` or `locations_file` is required.
+
+Example `config.json` (inline locations):
 
 ```json
 {
   "api_key": "YOUR_API_KEY",
   "locations": ["10001", "90210", "60605"],
-  "start_date": "2024-01-01",
-  "forecast_days": 5
+  "start_date": "2024-01-01"
 }
 ```
+
+Example `config.json` (locations file):
+
+```json
+{
+  "api_key": "YOUR_API_KEY",
+  "locations_file": "/path/to/locations.json",
+  "start_date": "2024-01-01"
+}
+```
+
+`locations.json`:
+
+```json
+[
+  {"location": "10001", "custom_id": "new-york"},
+  {"location": "90210", "custom_id": "beverly-hills"},
+  {"location": "60605", "custom_id": "chicago"}
+]
+```
+
+### Bulk API
+
+When `use_bulk_requests` is `true`, the tap sends all locations in a single POST request to the WeatherAPI [Bulk endpoint](https://www.weatherapi.com/docs/#intro-bulk) instead of making one GET request per location.
+
+Requirements and limits:
+
+- Requires a **WeatherAPI Pro+, Business, or Enterprise** plan.
+- The API accepts a maximum of **50 locations per request**. When your list exceeds 50, the tap automatically splits it into consecutive chunks of 50 and makes one request per chunk.
+- Each location still counts as one API call toward your quota regardless of chunking.
+- `custom_id` in `locations_file` is passed through the bulk request and back into each emitted record, making it easy to join results to your own identifiers.
+- **State:** In bulk mode the tap maintains a single shared state bookmark across all locations. If you add or remove locations between runs, re-run with `--full-refresh` to ensure all locations are synced from the beginning.
 
 ### Environment variables
 
