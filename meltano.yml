@@ -49,9 +49,14 @@ plugins:
         and used to correlate bulk-request responses with the original query.
 
     - name: start_date
-      kind: string
+      kind: date_iso8601
       label: Start Date
       description: Earliest date for historical data sync (YYYY-MM-DD).
+
+    - name: end_date
+      kind: date_iso8601
+      label: Start Date
+      description: Latest date for historical data sync, in ISO format. Defaults to yesterday's date.
 
     - name: forecast_days
       kind: integer

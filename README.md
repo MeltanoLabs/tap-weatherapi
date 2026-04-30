@@ -48,6 +48,7 @@ uv tool install git+https://github.com/MeltanoLabs/tap-weatherapi.git@main
 | `locations` | ✅\* | - | JSON array of locations to sync. Accepts city names, US zip codes, UK/Canada postcodes, `lat,lon` pairs, airport codes, IP addresses, and [more](https://www.weatherapi.com/docs/#intro-request). |
 | `locations_file` | ✅\* | - | Path to a JSON file listing locations. Format: `[{"location": "90210", "custom_id": "beverly-hills"}, ...]`. Use instead of `locations` when managing many locations. |
 | `start_date` | ✅ | - | Earliest date for the `historical` stream (`YYYY-MM-DD`). |
+| `end_date` | - | Yesterday's date | Latest date for the `historical` stream (`YYYY-MM-DD`). |
 | `forecast_days` | - | `5` | Number of days for the `forecast` stream (1–14). |
 | `use_bulk_requests` | - | `false` | Fetch all locations in a single POST request. Requires Pro+, Business, or Enterprise plan. Max 50 locations. See [Bulk API](#bulk-api). |
 
