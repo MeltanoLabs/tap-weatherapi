@@ -83,6 +83,14 @@ Example `config.json` (locations file):
 ]
 ```
 
+or as a JSON lines file with a `.jsonl` file extension:
+
+```json
+{"location": "10001", "custom_id": "new-york"}
+{"location": "90210", "custom_id": "beverly-hills"}
+{"location": "60605", "custom_id": "chicago"}
+```
+
 ### Bulk API
 
 When `use_bulk_requests` is `true`, the tap sends all locations in a single POST request to the WeatherAPI [Bulk endpoint](https://www.weatherapi.com/docs/#intro-bulk) instead of making one GET request per location.
