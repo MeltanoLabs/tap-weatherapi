@@ -74,10 +74,7 @@ def _get_location_from_file(path: Path) -> list[dict[str, Any]]:
             not isinstance(data, list)  # Expecting a list of location objects
             or not all(isinstance(loc, dict) and "location" in loc for loc in data)
         ):
-            logger.error(
-                "Expected a list of location objects in 'locations_file', got %s",
-                data,
-            )
+            logger.error("Expected a list of location objects in 'locations_file'")
             msg = "Invalid format in locations_file"
             raise ValueError(msg)
         return data
