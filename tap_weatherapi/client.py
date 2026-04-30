@@ -8,6 +8,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from singer_sdk.authenticators import APIKeyAuthenticator
@@ -64,11 +65,11 @@ def _extract_records(response: dict[str, Any]) -> Iterable[Record]:
 
 
 @cache
-def _get_location_from_file(path: str) -> list[dict[str, Any]]:
+def _get_location_from_file(path: Path) -> list[dict[str, Any]]:
     logger.info("Loading locations from file: %s", path)
 
     with open(path) as f:  # noqa: PTH123
-        data = json.load(f)
+        data = [json.loads(line) for line in f] if path.suffix == ".jsonl" else json.load(f)
         if (
             not isinstance(data, list)  # Expecting a list of location objects
             or not all(isinstance(loc, dict) and "location" in loc for loc in data)
@@ -146,6 +147,7 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
         # Non-bulk: key state on "location" only so changing custom_id in
         # locations_file doesn't reset incremental bookmarks.
         if self.config["use_bulk_requests"]:
+            self.logger.info("Using 'bulk' requests")
             self._http_method = "POST"
             self.state_partitioning_keys = None
         else:
@@ -156,7 +158,7 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
             self.logger.info("Using locations from config")
             self._locations = [{"location": loc} for loc in locations]
         elif locations_file := self.config.get("locations_file"):
-            self._locations = _get_location_from_file(locations_file)
+            self._locations = _get_location_from_file(Path(locations_file))
         else:
             msg = "Either 'locations' or 'locations_file' config must be provided"
             raise ValueError(msg)
