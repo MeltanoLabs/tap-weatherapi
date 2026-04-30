@@ -251,11 +251,16 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
         return DateRangePaginator(start_date=start, end_date=end)
 
     def _effective_start_date(self, context: Context | None) -> date:
-        """Return start date from state bookmark (incremental) or config."""
-        state_val = self.get_starting_replication_key_value(context)
-        if state_val:
-            raw = state_val if isinstance(state_val, str) else str(state_val)
-            return datetime.fromisoformat(raw).date()
+        """Return start date from state bookmark (incremental) or config.
+
+        Advances one day past the bookmark when resuming from state so the
+        already-synced day is not re-fetched.
+        """
+        context_state = self.get_context_state(context)
+        bookmark = context_state.get("replication_key_value")
+        if bookmark:
+            raw = bookmark if isinstance(bookmark, str) else str(bookmark)
+            return datetime.fromisoformat(raw).date() + timedelta(days=1)
         return datetime.fromisoformat(self.config["start_date"]).date()
 
     @override
