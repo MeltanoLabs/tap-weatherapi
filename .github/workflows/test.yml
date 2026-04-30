@@ -47,7 +47,6 @@ jobs:
     needs: [build-package]
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       max-parallel: 1
       matrix:
         python-version: ${{ fromJson(needs.build-package.outputs.supported-python-versions) }}

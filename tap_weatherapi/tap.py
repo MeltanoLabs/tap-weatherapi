@@ -74,6 +74,15 @@ class TapWeatherAPI(Tap):
             description="Earliest date for historical data sync, in ISO format",
         ),
         th.Property(
+            "end_date",
+            th.DateTimeType(nullable=True),
+            required=False,
+            title="End Date",
+            description=(
+                "Latest date for historical data sync, in ISO format. Defaults to yesterday's date."
+            ),
+        ),
+        th.Property(
             "forecast_days",
             th.IntegerType(nullable=False, minimum=1, maximum=14),
             default=5,

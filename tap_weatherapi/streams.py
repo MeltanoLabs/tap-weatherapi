@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import KW_ONLY, dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from singer_sdk import typing as th
@@ -18,6 +18,8 @@ else:
     from typing_extensions import override
 
 if TYPE_CHECKING:
+    from datetime import date
+
     import requests
     from singer_sdk.helpers.types import Context
 
@@ -240,14 +242,18 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
     @override
     def get_non_bulk_paginator(self) -> DateRangePaginator:
         start = self._effective_start_date(self.context)
-        end = _today() - timedelta(days=1)
+
+        if end_date_input := self.config.get("end_date"):
+            end = datetime.fromisoformat(end_date_input).date()
+        else:
+            end = _today() - timedelta(days=1)
+
         return DateRangePaginator(start_date=start, end_date=end)
 
     def _effective_start_date(self, context: Context | None) -> date:
         """Return start date from state bookmark (incremental) or config."""
         state_val = self.get_starting_replication_key_value(context)
         if state_val:
-            # Advance one day past the last synced date to avoid re-processing.
             raw = state_val if isinstance(state_val, str) else str(state_val)
             return datetime.fromisoformat(raw).date()
         return datetime.fromisoformat(self.config["start_date"]).date()
