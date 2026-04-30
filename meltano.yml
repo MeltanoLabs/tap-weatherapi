@@ -55,7 +55,7 @@ plugins:
 
     - name: end_date
       kind: date_iso8601
-      label: Start Date
+      label: End Date
       description: Latest date for historical data sync, in ISO format. Defaults to yesterday's date.
 
     - name: forecast_days
