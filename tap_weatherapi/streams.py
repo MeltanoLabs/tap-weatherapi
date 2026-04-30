@@ -249,7 +249,7 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
         if state_val:
             # Advance one day past the last synced date to avoid re-processing.
             raw = state_val if isinstance(state_val, str) else str(state_val)
-            return date.fromisoformat(raw)
+            return datetime.fromisoformat(raw).date()
         return datetime.fromisoformat(self.config["start_date"]).date()
 
     @override
