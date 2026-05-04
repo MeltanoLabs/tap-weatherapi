@@ -27,9 +27,16 @@ if TYPE_CHECKING:
     from singer_sdk.helpers.types import Context, Record
 
 _T = TypeVar("_T")
-_BULK_CHUNK_SIZE = 50  # WeatherAPI bulk endpoint limit
 
 logger = logging.getLogger(__name__)
+
+
+def _chunk_locations(
+    locations: list[dict[str, Any]],
+    chunk_size: int,
+) -> list[list[dict[str, Any]]]:
+    """Split locations into consecutive chunks of at most chunk_size."""
+    return [locations[i : i + chunk_size] for i in range(0, len(locations), chunk_size)]
 
 
 def _extract_records(response: dict[str, Any]) -> Iterable[Record]:
@@ -192,10 +199,8 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
         if not self.config["use_bulk_requests"]:
             return inner
 
-        chunks = [
-            self._locations[i : i + _BULK_CHUNK_SIZE]
-            for i in range(0, len(self._locations), _BULK_CHUNK_SIZE)
-        ]
+        chunk_size: int = self.config["bulk_request_chunk_size"]
+        chunks = _chunk_locations(self._locations, chunk_size)
         return BulkChunkPaginationWrapper(wrapped=inner, chunks=chunks)
 
     @override

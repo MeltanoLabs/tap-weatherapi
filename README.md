@@ -50,7 +50,8 @@ uv tool install git+https://github.com/MeltanoLabs/tap-weatherapi.git@main
 | `start_date` | ✅ | - | Earliest date for the `historical` stream (`YYYY-MM-DD`). |
 | `end_date` | - | Yesterday's date | Latest date for the `historical` stream (`YYYY-MM-DD`). |
 | `forecast_days` | - | `5` | Number of days for the `forecast` stream (1–14). |
-| `use_bulk_requests` | - | `false` | Fetch all locations in a single POST request. Requires Pro+, Business, or Enterprise plan. Max 50 locations. See [Bulk API](#bulk-api). |
+| `use_bulk_requests` | - | `false` | Fetch all locations in a single POST request. Requires Pro+, Business, or Enterprise plan. See [Bulk API](#bulk-api). |
+| `bulk_request_chunk_size` | - | `50` | Max locations per bulk POST request (5–50). The tap splits larger lists into chunks of this size. Only used when `use_bulk_requests` is `true`. |
 
 \* Exactly one of `locations` or `locations_file` is required.
 
@@ -99,7 +100,7 @@ When `use_bulk_requests` is `true`, the tap sends all locations in a single POST
 Requirements and limits:
 
 - Requires a **WeatherAPI Pro+, Business, or Enterprise** plan.
-- The API accepts a maximum of **50 locations per request**. When your list exceeds 50, the tap automatically splits it into consecutive chunks of 50 and makes one request per chunk.
+- The API accepts a maximum of **50 locations per request**. When your list exceeds `bulk_request_chunk_size` (default 50), the tap automatically splits it into consecutive chunks and makes one request per chunk. Set `bulk_request_chunk_size` to a lower value if you want smaller batches (minimum 5).
 - Each location still counts as one API call toward your quota regardless of chunking.
 - `custom_id` in `locations_file` is passed through the bulk request and back into each emitted record, making it easy to join results to your own identifiers.
 - **State:** In bulk mode the tap maintains a single shared state bookmark across all locations. If you add or remove locations between runs, re-run with `--full-refresh` to ensure all locations are synced from the beginning.

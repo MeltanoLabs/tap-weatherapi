@@ -72,9 +72,17 @@ plugins:
       description: >
         Send all locations in a single POST request instead of one GET request per location.
         Requires a WeatherAPI Pro+, Business, or Enterprise plan.
-        Maximum 50 locations per request.
         Each location in a bulk request still counts as one API call.
         See https://www.weatherapi.com/docs/#intro-bulk.
+
+    - name: bulk_request_chunk_size
+      kind: integer
+      value: 50
+      label: Bulk Request Chunk Size
+      description: >
+        Maximum number of locations per bulk POST request (5–50).
+        When the location list exceeds this value the tap splits it into consecutive chunks of this size.
+        Only applies when use_bulk_requests is true.
 
   loaders:
   - name: target-jsonl
