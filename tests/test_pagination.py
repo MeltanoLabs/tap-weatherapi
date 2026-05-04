@@ -9,7 +9,7 @@ import pytest
 import requests
 from singer_sdk.pagination import BasePageNumberPaginator
 
-from tap_weatherapi.client import BulkChunkPaginationWrapper
+from tap_weatherapi.client import BulkChunkPaginationWrapper, _chunk_locations
 from tap_weatherapi.streams import DateRangePaginator, DateWindow
 
 if sys.version_info >= (3, 12):
@@ -222,3 +222,41 @@ class TestBulkChunkPaginationWrapper:  # noqa: D101
             *[(chunks[0], w) for w in expected_windows],
             *[(chunks[1], w) for w in expected_windows],
         ]
+
+
+_LOCS = [{"location": str(i)} for i in range(120)]
+
+
+@pytest.mark.parametrize(
+    ("chunk_size", "expected_chunks", "expected_last_len"),
+    [
+        (50, 3, 20),  # 120 / 50 → 2 full + 1 of 20
+        (10, 12, 10),  # 120 / 10 → 12 full
+        (7, 18, 1),  # 120 / 7 → 17 full (119) + 1 of 1
+        (5, 24, 5),  # 120 / 5 → 24 full
+    ],
+)
+def test_chunk_locations_sizes(
+    chunk_size: int,
+    expected_chunks: int,
+    expected_last_len: int,
+) -> None:
+    chunks = _chunk_locations(_LOCS, chunk_size)
+    assert len(chunks) == expected_chunks
+    assert all(len(c) <= chunk_size for c in chunks)
+    assert len(chunks[-1]) == expected_last_len
+
+
+def test_chunk_locations_preserves_order() -> None:
+    chunks = _chunk_locations(_LOCS, 50)
+    flat = [loc for chunk in chunks for loc in chunk]
+    assert flat == _LOCS
+
+
+def test_chunk_locations_empty() -> None:
+    assert _chunk_locations([], 50) == []
+
+
+def test_chunk_locations_smaller_than_chunk() -> None:
+    chunks = _chunk_locations([{"location": "A"}, {"location": "B"}], 50)
+    assert chunks == [[{"location": "A"}, {"location": "B"}]]

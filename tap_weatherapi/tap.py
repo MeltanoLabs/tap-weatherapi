@@ -98,9 +98,19 @@ class TapWeatherAPI(Tap):
                 "Send all locations in a single POST request instead of one GET request per "
                 "location. "
                 "Requires a WeatherAPI Pro+, Business, or Enterprise plan. "
-                "Maximum 50 locations per request. "
                 "Each location in a bulk request still counts as one API call. "
                 "See https://www.weatherapi.com/docs/#intro-bulk."
+            ),
+        ),
+        th.Property(
+            "bulk_request_chunk_size",
+            th.IntegerType(nullable=False, minimum=5, maximum=50),
+            default=50,
+            title="Bulk Request Chunk Size",
+            description=(
+                "Maximum number of locations per bulk POST request (5-50). "
+                "When the location list exceeds this value the tap splits it into consecutive "
+                "chunks of this size. Only applies when `use_bulk_requests` is true."
             ),
         ),
     ).to_dict()
