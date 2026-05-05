@@ -7,7 +7,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import cache
+from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
@@ -158,14 +158,18 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
             self._http_method = "GET"
             self.state_partitioning_keys = ["location"]
 
+    @cached_property
+    def locations(self) -> list[dict[str, Any]]:
+        """Locations to get weather data for."""
         if locations := self.config.get("locations"):
             self.logger.info("Using locations from config")
-            self._locations = [{"location": loc} for loc in locations]
-        elif locations_file := self.config.get("locations_file"):
-            self._locations = _get_location_from_file(Path(locations_file))
-        else:
-            msg = "Either 'locations' or 'locations_file' config must be provided"
-            raise ValueError(msg)
+            return [{"location": loc} for loc in locations]
+
+        if locations_file := self.config.get("locations_file"):
+            return _get_location_from_file(Path(locations_file))
+
+        msg = "Either 'locations' or 'locations_file' config must be provided"
+        raise ValueError(msg)
 
     @property
     @override
@@ -183,11 +187,11 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
 
     @property
     @override
-    def partitions(self) -> list[dict[str, Any]]:
+    def partitions(self) -> list[dict[str, Any]] | None:
         if self.config["use_bulk_requests"]:
-            # Single empty partition; chunk iteration is handled inside get_records.
-            return [{}]
-        return self._locations
+            # No partitions; chunk iteration is handled inside get_records.
+            return None
+        return self.locations
 
     @abstractmethod
     def get_non_bulk_paginator(self) -> BaseAPIPaginator[_T]:
@@ -200,7 +204,7 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
             return inner
 
         chunk_size: int = self.config["bulk_request_chunk_size"]
-        chunks = _chunk_locations(self._locations, chunk_size)
+        chunks = _chunk_locations(self.locations, chunk_size)
         return BulkChunkPaginationWrapper(wrapped=inner, chunks=chunks)
 
     @override
