@@ -60,7 +60,7 @@ typing = [
     { include-group = "cache" },
     { include-group = "test" },
     "mypy>=1.19.1",
-    "ty>=0.0.21",
+    "ty>=0.0.34",
     "types-requests",
 ]
 
