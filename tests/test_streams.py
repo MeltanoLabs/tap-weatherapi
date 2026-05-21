@@ -6,7 +6,7 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
-from singer_sdk.exceptions import RetriableAPIError
+from singer_sdk.exceptions import RetriableAPIError, FatalAPIError
 
 from tap_weatherapi.streams import ForecastStream, HistoricalStream
 
@@ -92,6 +92,7 @@ def _mock_response(
 ) -> MagicMock:
     """Build a minimal mock requests.Response."""
     resp = MagicMock()
+    resp.url = url
     resp.status_code = status_code
     resp.json.return_value = json_body or {}
     resp.request = MagicMock()
@@ -133,7 +134,7 @@ class TestValidateResponse:
         resp.ok = False
         resp.reason = "Bad Request"
 
-        with pytest.raises(RetriableAPIError):
+        with pytest.raises(FatalAPIError):
             stream.validate_response(resp)
 
 
