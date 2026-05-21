@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sys
@@ -14,7 +15,6 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from urllib.parse import parse_qs, urlparse
 
 from singer_sdk.authenticators import APIKeyAuthenticator
-from singer_sdk.exceptions import RetriableAPIError
 from singer_sdk.pagination import BaseAPIPaginator
 from singer_sdk.streams import RESTStream
 
@@ -218,17 +218,18 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
     @override
     def validate_response(self, response: requests.Response) -> None:
         """Validate response, skipping unresolvable locations and retrying timeouts."""
-        if response.status_code == 400:  # noqa: PLR2004
+        if response.status_code == HTTPStatus.BAD_REQUEST:  # 400
             try:
                 error_code = response.json().get("error", {}).get("code")
             except (json.JSONDecodeError, AttributeError):
                 error_code = None
-            if error_code == 1006:
-                try:
+
+            if error_code == 1006:  # noqa: PLR2004
+                location = "unknown"
+                with contextlib.suppress(Exception):
                     params = parse_qs(urlparse(response.request.url).query)
                     location = params.get("q", ["unknown"])[0]
-                except Exception:
-                    location = "unknown"
+
                 self.logger.warning(
                     "Skipping location not found in WeatherAPI (error 1006): %s — stream: %s",
                     location,

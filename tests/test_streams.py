@@ -85,7 +85,11 @@ def _make_forecast_stream() -> ForecastStream:
     return ForecastStream(tap=tap)
 
 
-def _mock_response(status_code: int, json_body: dict | None = None, url: str = "https://api.weatherapi.com/v1/forecast.json?q=90210") -> MagicMock:
+def _mock_response(
+    status_code: int,
+    json_body: dict | None = None,
+    url: str = "https://api.weatherapi.com/v1/forecast.json?q=90210",
+) -> MagicMock:
     """Build a minimal mock requests.Response."""
     resp = MagicMock()
     resp.status_code = status_code
@@ -101,7 +105,11 @@ class TestValidateResponse:
     def test_1006_logs_warning_and_does_not_raise(self) -> None:
         """A 400/1006 response logs a warning and returns without raising."""
         stream = _make_forecast_stream()
-        resp = _mock_response(400, {"error": {"code": 1006, "message": "No matching location found."}}, url="https://api.weatherapi.com/v1/forecast.json?key=x&q=99999")
+        resp = _mock_response(
+            400,
+            {"error": {"code": 1006, "message": "No matching location found."}},
+            url="https://api.weatherapi.com/v1/forecast.json?key=x&q=99999",
+        )
 
         with patch.object(stream.logger, "warning") as mock_warn:
             stream.validate_response(resp)  # must not raise
@@ -125,7 +133,7 @@ class TestValidateResponse:
         resp.ok = False
         resp.reason = "Bad Request"
 
-        with pytest.raises(Exception):
+        with pytest.raises(RetriableAPIError):
             stream.validate_response(resp)
 
 
@@ -135,7 +143,9 @@ class TestParseResponse:
     def test_error_response_yields_nothing(self) -> None:
         """An error JSON response (e.g. after a skipped 1006) yields no records."""
         stream = _make_forecast_stream()
-        resp = _mock_response(400, {"error": {"code": 1006, "message": "No matching location found."}})
+        resp = _mock_response(
+            400, {"error": {"code": 1006, "message": "No matching location found."}}
+        )
 
         records = list(stream.parse_response(resp))
         assert records == []
