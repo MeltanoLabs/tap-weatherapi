@@ -185,10 +185,23 @@ class TestParseResponse:
                     "query": {
                         "q": "90210",
                         "custom_id": None,
-                        "location": {"name": "Beverly Hills", "region": "California", "country": "USA", "lat": 34.1, "lon": -118.4, "tz_id": "America/Los_Angeles"},
+                        "location": {
+                            "name": "Beverly Hills",
+                            "region": "California",
+                            "country": "USA",
+                            "lat": 34.1,
+                            "lon": -118.4,
+                            "tz_id": "America/Los_Angeles",
+                        },
                         "forecast": {
                             "forecastday": [
-                                {"date": "2024-01-01", "date_epoch": 1704067200, "day": {}, "astro": {}, "hour": []}
+                                {
+                                    "date": "2024-01-01",
+                                    "date_epoch": 1704067200,
+                                    "day": {},
+                                    "astro": {},
+                                    "hour": [],
+                                }
                             ]
                         },
                     }

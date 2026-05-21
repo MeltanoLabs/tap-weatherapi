@@ -235,7 +235,9 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
                 raw_body = response.request.body
                 if not isinstance(raw_body, (str, bytes, bytearray)):
                     return "bulk"
-                locs = [loc.get("q", "unknown") for loc in json.loads(raw_body).get("locations", [])]
+                locs = [
+                    loc.get("q", "unknown") for loc in json.loads(raw_body).get("locations", [])
+                ]
                 return f"bulk chunk [{', '.join(locs)}]"
             return q
         except Exception:
@@ -252,8 +254,7 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
 
             if error_code == 1006:  # noqa: PLR2004
                 self.logger.warning(
-                    "Skipping location not found in WeatherAPI (error 1006): %s — "
-                    "stream: %s",
+                    "Skipping location not found in WeatherAPI (error 1006): %s — stream: %s",
                     self._extract_request_location(response),
                     self.name,
                 )
