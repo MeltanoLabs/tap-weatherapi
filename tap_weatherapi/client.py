@@ -8,6 +8,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cache, cached_property
+from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from urllib.parse import parse_qs, urlparse
@@ -146,6 +147,11 @@ class BulkChunkPaginationWrapper(BaseAPIPaginator[BulkChunk[_T]], Generic[_T]):
 class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
     """WeatherAPI stream class."""
 
+    extra_retry_statuses = (
+        HTTPStatus.TOO_MANY_REQUESTS,  # 429
+        HTTPStatus.REQUEST_TIMEOUT,  # 408
+    )
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the stream, setting the HTTP method based on config."""
         super().__init__(*args, **kwargs)
@@ -230,8 +236,7 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
                     self.name,
                 )
                 return
-        if response.status_code == 408:  # noqa: PLR2004
-            raise RetriableAPIError("408 Request Timeout — will retry", response)
+
         super().validate_response(response)
 
     @override
