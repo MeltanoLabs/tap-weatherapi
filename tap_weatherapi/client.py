@@ -10,8 +10,10 @@ from dataclasses import dataclass
 from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from urllib.parse import parse_qs, urlparse
 
 from singer_sdk.authenticators import APIKeyAuthenticator
+from singer_sdk.exceptions import RetriableAPIError
 from singer_sdk.pagination import BaseAPIPaginator
 from singer_sdk.streams import RESTStream
 
@@ -208,9 +210,36 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
         return BulkChunkPaginationWrapper(wrapped=inner, chunks=chunks)
 
     @override
+    def validate_response(self, response: requests.Response) -> None:
+        """Validate response, skipping unresolvable locations and retrying timeouts."""
+        if response.status_code == 400:  # noqa: PLR2004
+            try:
+                error_code = response.json().get("error", {}).get("code")
+            except (json.JSONDecodeError, AttributeError):
+                error_code = None
+            if error_code == 1006:
+                try:
+                    params = parse_qs(urlparse(response.request.url).query)
+                    location = params.get("q", ["unknown"])[0]
+                except Exception:
+                    location = "unknown"
+                self.logger.warning(
+                    "Skipping location not found in WeatherAPI (error 1006): %s — "
+                    "stream: %s",
+                    location,
+                    self.name,
+                )
+                return
+        if response.status_code == 408:  # noqa: PLR2004
+            raise RetriableAPIError("408 Request Timeout — will retry", response)
+        super().validate_response(response)
+
+    @override
     def parse_response(self, response: requests.Response) -> Iterable[Record]:
         """Extract one record per forecast/history day from the WeatherAPI response."""
         data = response.json()
+        if "error" in data:
+            return
         if self.config["use_bulk_requests"]:
             for entry in data["bulk"]:
                 for record in _extract_records(entry["query"]):
