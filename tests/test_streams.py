@@ -69,15 +69,16 @@ class TestEffectiveStartDate:
         assert result == date(2024, 1, 16)
 
 
-def _make_forecast_stream() -> ForecastStream:
+def _make_forecast_stream(*, bulk: bool = False) -> ForecastStream:
     """Return a ForecastStream instance backed by minimal mocked tap/config."""
     tap = MagicMock()
     tap.config = {
         "api_key": "test",
         "locations": ["London"],
         "start_date": "2024-01-01",
-        "use_bulk_requests": False,
+        "use_bulk_requests": bulk,
         "forecast_days": 5,
+        "bulk_request_chunk_size": 50,
     }
     tap.state = {}
     tap.catalog = MagicMock()
@@ -89,6 +90,7 @@ def _mock_response(
     status_code: int,
     json_body: dict | None = None,
     url: str = "https://api.weatherapi.com/v1/forecast.json?q=90210",
+    body: str | None = None,
 ) -> MagicMock:
     """Build a minimal mock requests.Response."""
     resp = MagicMock()
@@ -97,6 +99,7 @@ def _mock_response(
     resp.json.return_value = json_body or {}
     resp.request = MagicMock()
     resp.request.url = url
+    resp.request.body = body
     return resp
 
 
@@ -137,6 +140,27 @@ class TestValidateResponse:
         with pytest.raises(FatalAPIError):
             stream.validate_response(resp)
 
+    def test_bulk_1006_logs_all_locations_from_body(self) -> None:
+        """Bulk 400/1006 logs every location in the rejected chunk, not just 'bulk'."""
+        import json as _json
+
+        stream = _make_forecast_stream(bulk=True)
+        bulk_body = _json.dumps({"locations": [{"q": "11111"}, {"q": "22222"}]})
+        resp = _mock_response(
+            400,
+            {"error": {"code": 1006, "message": "No matching location found."}},
+            url="https://api.weatherapi.com/v1/forecast.json?key=x&q=bulk",
+            body=bulk_body,
+        )
+
+        with patch.object(stream.logger, "warning") as mock_warn:
+            stream.validate_response(resp)  # must not raise
+
+        mock_warn.assert_called_once()
+        warning_location_arg = mock_warn.call_args[0][1]
+        assert "11111" in warning_location_arg
+        assert "22222" in warning_location_arg
+
 
 class TestParseResponse:
     """Unit tests for WeatherAPIStream.parse_response."""
@@ -150,3 +174,39 @@ class TestParseResponse:
 
         records = list(stream.parse_response(resp))
         assert records == []
+
+    def test_bulk_per_entry_error_is_skipped_and_valid_entries_yielded(self) -> None:
+        """In a bulk 200 response, error entries are skipped and valid ones yield records."""
+        stream = _make_forecast_stream(bulk=True)
+        bulk_body = {
+            "bulk": [
+                {
+                    "query": {
+                        "q": "90210",
+                        "custom_id": None,
+                        "location": {"name": "Beverly Hills", "region": "California", "country": "USA", "lat": 34.1, "lon": -118.4, "tz_id": "America/Los_Angeles"},
+                        "forecast": {
+                            "forecastday": [
+                                {"date": "2024-01-01", "date_epoch": 1704067200, "day": {}, "astro": {}, "hour": []}
+                            ]
+                        },
+                    }
+                },
+                {
+                    "query": {
+                        "q": "99999",
+                        "custom_id": None,
+                        "error": {"code": 1006, "message": "No matching location found."},
+                    }
+                },
+            ]
+        }
+        resp = _mock_response(200, bulk_body)
+
+        with patch.object(stream.logger, "warning") as mock_warn:
+            records = list(stream.parse_response(resp))
+
+        assert len(records) == 1
+        assert records[0]["location"] == "90210"
+        mock_warn.assert_called_once()
+        assert "99999" in mock_warn.call_args[0][2]

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import sys
@@ -215,6 +214,27 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
         chunks = _chunk_locations(self.locations, chunk_size)
         return BulkChunkPaginationWrapper(wrapped=inner, chunks=chunks)
 
+    def _extract_request_location(self, response: requests.Response) -> str:
+        """Return a human-readable location string from the request for log messages.
+
+        For non-bulk GET requests the location is the ``q`` query parameter.
+        For bulk POST requests the locations are in the JSON body; all of them
+        are returned as a comma-separated list so the caller knows which chunk
+        was rejected.
+        """
+        try:
+            params = parse_qs(urlparse(response.request.url).query)
+            q = params.get("q", [None])[0]
+            if q == "bulk":
+                body = json.loads(response.request.body)
+                locs = [loc.get("q", "unknown") for loc in body.get("locations", [])]
+                return f"bulk chunk [{', '.join(locs)}]"
+            if q:
+                return q
+        except Exception:
+            pass
+        return "unknown"
+
     @override
     def validate_response(self, response: requests.Response) -> None:
         """Validate response, skipping unresolvable locations and retrying timeouts."""
@@ -225,14 +245,10 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
                 error_code = None
 
             if error_code == 1006:  # noqa: PLR2004
-                location = "unknown"
-                with contextlib.suppress(Exception):
-                    params = parse_qs(urlparse(response.request.url).query)
-                    location = params.get("q", ["unknown"])[0]
-
                 self.logger.warning(
-                    "Skipping location not found in WeatherAPI (error 1006): %s — stream: %s",
-                    location,
+                    "Skipping location not found in WeatherAPI (error 1006): %s — "
+                    "stream: %s",
+                    self._extract_request_location(response),
                     self.name,
                 )
                 return
@@ -247,9 +263,19 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
             return
         if self.config["use_bulk_requests"]:
             for entry in data["bulk"]:
-                for record in _extract_records(entry["query"]):
-                    record["custom_id"] = entry["query"].get("custom_id")
-                    record["location"] = entry["query"].get("q")
+                query = entry["query"]
+                if "error" in query:
+                    self.logger.warning(
+                        "Skipping location with error %s in WeatherAPI bulk response: "
+                        "%s — stream: %s",
+                        query["error"].get("code"),
+                        query.get("q", "unknown"),
+                        self.name,
+                    )
+                    continue
+                for record in _extract_records(query):
+                    record["custom_id"] = query.get("custom_id")
+                    record["location"] = query.get("q")
                     yield record
         else:
             yield from _extract_records(data)
