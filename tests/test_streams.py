@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -88,7 +89,7 @@ def _make_forecast_stream(*, bulk: bool = False) -> ForecastStream:
 
 def _mock_response(
     status_code: int,
-    json_body: dict | None = None,
+    json_body: dict[str, Any] | None = None,
     url: str = "https://api.weatherapi.com/v1/forecast.json?q=90210",
     body: str | None = None,
 ) -> MagicMock:

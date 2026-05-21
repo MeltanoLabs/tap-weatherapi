@@ -223,17 +223,23 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
         was rejected.
         """
         try:
-            params = parse_qs(urlparse(response.request.url).query)
-            q = params.get("q", [None])[0]
+            url = response.request.url
+            if not isinstance(url, str):
+                return "unknown"
+            params = parse_qs(urlparse(url).query)
+            q_values = params.get("q")
+            if not q_values:
+                return "unknown"
+            q = q_values[0]
             if q == "bulk":
-                body = json.loads(response.request.body)
-                locs = [loc.get("q", "unknown") for loc in body.get("locations", [])]
+                raw_body = response.request.body
+                if not isinstance(raw_body, (str, bytes, bytearray)):
+                    return "bulk"
+                locs = [loc.get("q", "unknown") for loc in json.loads(raw_body).get("locations", [])]
                 return f"bulk chunk [{', '.join(locs)}]"
-            if q:
-                return q
+            return q
         except Exception:
-            pass
-        return "unknown"
+            return "unknown"
 
     @override
     def validate_response(self, response: requests.Response) -> None:
