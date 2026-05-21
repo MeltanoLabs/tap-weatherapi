@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from singer_sdk.exceptions import RetriableAPIError, FatalAPIError
+from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 
 from tap_weatherapi.streams import ForecastStream, HistoricalStream
 
@@ -143,10 +144,8 @@ class TestValidateResponse:
 
     def test_bulk_1006_logs_all_locations_from_body(self) -> None:
         """Bulk 400/1006 logs every location in the rejected chunk, not just 'bulk'."""
-        import json as _json
-
         stream = _make_forecast_stream(bulk=True)
-        bulk_body = _json.dumps({"locations": [{"q": "11111"}, {"q": "22222"}]})
+        bulk_body = json.dumps({"locations": [{"q": "11111"}, {"q": "22222"}]})
         resp = _mock_response(
             400,
             {"error": {"code": 1006, "message": "No matching location found."}},

@@ -239,9 +239,10 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
                     loc.get("q", "unknown") for loc in json.loads(raw_body).get("locations", [])
                 ]
                 return f"bulk chunk [{', '.join(locs)}]"
-            return q
-        except Exception:
+        except Exception:  # noqa: BLE001
             return "unknown"
+        else:
+            return q
 
     @override
     def validate_response(self, response: requests.Response) -> None:
