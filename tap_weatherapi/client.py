@@ -230,8 +230,7 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
                 except Exception:
                     location = "unknown"
                 self.logger.warning(
-                    "Skipping location not found in WeatherAPI (error 1006): %s — "
-                    "stream: %s",
+                    "Skipping location not found in WeatherAPI (error 1006): %s — stream: %s",
                     location,
                     self.name,
                 )
