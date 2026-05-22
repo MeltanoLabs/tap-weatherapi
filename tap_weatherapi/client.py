@@ -8,8 +8,10 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cache, cached_property
+from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from urllib.parse import parse_qs, urlparse
 
 from singer_sdk.authenticators import APIKeyAuthenticator
 from singer_sdk.pagination import BaseAPIPaginator
@@ -144,6 +146,11 @@ class BulkChunkPaginationWrapper(BaseAPIPaginator[BulkChunk[_T]], Generic[_T]):
 class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
     """WeatherAPI stream class."""
 
+    extra_retry_statuses = (
+        HTTPStatus.TOO_MANY_REQUESTS,  # 429
+        HTTPStatus.REQUEST_TIMEOUT,  # 408
+    )
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the stream, setting the HTTP method based on config."""
         super().__init__(*args, **kwargs)
@@ -207,15 +214,76 @@ class WeatherAPIStream(RESTStream[_T], ABC, Generic[_T]):
         chunks = _chunk_locations(self.locations, chunk_size)
         return BulkChunkPaginationWrapper(wrapped=inner, chunks=chunks)
 
+    def _extract_request_location(self, response: requests.Response) -> str:
+        """Return a human-readable location string from the request for log messages.
+
+        For non-bulk GET requests the location is the ``q`` query parameter.
+        For bulk POST requests the locations are in the JSON body; all of them
+        are returned as a comma-separated list so the caller knows which chunk
+        was rejected.
+        """
+        try:
+            url = response.request.url
+            if not isinstance(url, str):
+                return "unknown"
+            params = parse_qs(urlparse(url).query)
+            q_values = params.get("q")
+            if not q_values:
+                return "unknown"
+            q = q_values[0]
+            if q == "bulk":
+                raw_body = response.request.body
+                if not isinstance(raw_body, (str, bytes, bytearray)):
+                    return "bulk"
+                locs = [
+                    loc.get("q", "unknown") for loc in json.loads(raw_body).get("locations", [])
+                ]
+                return f"bulk chunk [{', '.join(locs)}]"
+        except Exception:  # noqa: BLE001
+            return "unknown"
+        else:
+            return q
+
+    @override
+    def validate_response(self, response: requests.Response) -> None:
+        """Validate response, skipping unresolvable locations and retrying timeouts."""
+        if response.status_code == HTTPStatus.BAD_REQUEST:  # 400
+            try:
+                error_code = response.json().get("error", {}).get("code")
+            except (json.JSONDecodeError, AttributeError):
+                error_code = None
+
+            if error_code == 1006:  # noqa: PLR2004
+                self.logger.warning(
+                    "Skipping location not found in WeatherAPI (error 1006): %s — stream: %s",
+                    self._extract_request_location(response),
+                    self.name,
+                )
+                return
+
+        super().validate_response(response)
+
     @override
     def parse_response(self, response: requests.Response) -> Iterable[Record]:
         """Extract one record per forecast/history day from the WeatherAPI response."""
         data = response.json()
+        if "error" in data:
+            return
         if self.config["use_bulk_requests"]:
             for entry in data["bulk"]:
-                for record in _extract_records(entry["query"]):
-                    record["custom_id"] = entry["query"].get("custom_id")
-                    record["location"] = entry["query"].get("q")
+                query = entry["query"]
+                if "error" in query:
+                    self.logger.warning(
+                        "Skipping location with error %s in WeatherAPI bulk response: "
+                        "%s — stream: %s",
+                        query["error"].get("code"),
+                        query.get("q", "unknown"),
+                        self.name,
+                    )
+                    continue
+                for record in _extract_records(query):
+                    record["custom_id"] = query.get("custom_id")
+                    record["location"] = query.get("q")
                     yield record
         else:
             yield from _extract_records(data)
