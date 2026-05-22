@@ -71,8 +71,6 @@ source = "vcs"
 addopts = [
     "--durations=10",
     "-ra",
-    "--strict-config",
-    "--strict-markers",
 ]
 filterwarnings = [
     "error",
@@ -80,10 +78,10 @@ filterwarnings = [
 ]
 log_level = "INFO"
 minversion = "9.0"
+strict = true
 testpaths = [
     "tests",
 ]
-xfail_strict = true
 
 [tool.mypy]
 enable_error_code = [

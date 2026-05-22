@@ -37,7 +37,7 @@ if TYPE_CHECKING:
                 {"location": "90210", "custom_id": "B.H."},
                 {"location": "New York", "custom_id": "N.Y."},
             ],
-            id="json-array",
+            id="jsonl",
         ),
     ],
 )
