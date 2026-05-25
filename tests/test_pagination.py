@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
-from singer_sdk.pagination import BasePageNumberPaginator
+from singer_sdk.pagination import PageNumberPaginator
 
 from tap_weatherapi.client import BulkChunkPaginationWrapper, _chunk_locations
 from tap_weatherapi.streams import DateRangePaginator, DateWindow
@@ -159,7 +159,7 @@ class TestDateRangePaginator:
 
 class TestBulkChunkPaginationWrapper:  # noqa: D101
     def test_chunk_paginator(self) -> None:  # noqa: D102
-        class MyPaginator(BasePageNumberPaginator):
+        class MyPaginator(PageNumberPaginator):
             @override
             def get_next(self, response: requests.Response) -> int | None:
                 return self._value + 1 if self._value < 2 else None  # noqa: PLR2004
