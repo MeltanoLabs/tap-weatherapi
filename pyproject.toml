@@ -53,14 +53,14 @@ cache = [
 ]
 test = [
     "pytest>=9.0.3",
-    "pytest-github-actions-annotate-failures>=0.3",
+    "pytest-github-actions-annotate-failures>=0.4.2",
     "singer-sdk[testing]",
 ]
 typing = [
     { include-group = "cache" },
     { include-group = "test" },
     "mypy>=2.0.0",
-    "ty>=0.0.49",
+    "ty>=0.0.53",
 ]
 
 [tool.hatch.version]
