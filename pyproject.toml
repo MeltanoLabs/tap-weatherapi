@@ -60,7 +60,7 @@ typing = [
     { include-group = "cache" },
     { include-group = "test" },
     "mypy>=2.0.0",
-    "ty>=0.0.53",
+    "ty>=0.0.55",
 ]
 
 [tool.hatch.version]
