@@ -273,7 +273,7 @@ class HistoricalStream(WeatherAPIStream[DateWindow]):
 
         if isinstance(next_page_token, BulkChunk):
             query = "bulk"
-            window: DateWindow = next_page_token.current_value  # ty:ignore[invalid-assignment]
+            window: DateWindow = next_page_token.current_value
         else:
             assert context is not None  # noqa: S101
             query = context["location"]
