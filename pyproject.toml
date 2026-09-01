@@ -124,9 +124,8 @@ convention = "google"
 
 # This configuration can be used to customize tox environments
 [tool.tox]
-min_version = "4.43"
 requires = [
-    "tox>=4.43",
+    "tox>=4.61",
     "tox-uv",
 ]
 env_list = [
@@ -137,6 +136,7 @@ env_list = [
 ]
 
 [tool.tox.env_run_base]
+description = "test with Python {py_dot_ver}"
 runner = "uv-venv-lock-runner"
 pass_env = [
     "GITHUB_*",
@@ -146,6 +146,7 @@ dependency_groups = [ "test" ]
 commands = [ [ "pytest", { replace = "posargs", default = [ "tests" ], extend = true } ] ]
 
 [tool.tox.env.typing]
+description = "type checks"
 dependency_groups = [ "test", "typing" ]
 commands = [
     [ "mypy", { replace = "posargs", default = [ "tap_weatherapi", "tests" ], extend = true } ],
